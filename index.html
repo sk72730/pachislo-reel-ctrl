@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>パチスロ リール制御開発システム - Mobile Touch</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <script>
+    if (typeof tailwind !== 'undefined') {
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Noto Sans JP"', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'monospace'],
+            }
+          }
+        }
+      };
+    }
+  </script>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans selection:bg-rose-500 selection:text-white pb-20">
+
+  <!-- ===================================================================
+       1. 上部固定フロートHUD（実機3×3リール窓 ＆ ガタつき完全防止設計）
+       =================================================================== -->
+  <header class="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800 sticky-hud px-2.5 py-2">
+    <div class="max-w-md mx-auto space-y-1.5">
+      
+      <!-- 1行目: 成立フラグ選択 & リセット & ポリシー -->
+      <div class="flex items-center gap-1.5">
+        <div class="flex-1 min-w-0">
+          <select id="sim-flag-select" onchange="onFlagChanged()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-rose-500 truncate">
+            <!-- JSで動的生成 -->
+          </select>
+        </div>
+
+        <select id="sim-miss-policy" onchange="onPolicyChanged()" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-[11px] text-slate-300 focus:outline-none">
+          <option value="min">最短停止</option>
+          <option value="avoid_fake">ガセ回避</option>
+          <option value="keep_fake">煽り維持</option>
+        </select>
+
+        <button onclick="resetReelTest()" class="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-rose-300 border border-rose-500/40 px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 shrink-0">
+          <span>↺</span> リセット
+        </button>
+      </div>
+
+      <!-- 2行目: 3×3 リール窓ディスプレイ（実機窓スタイル・常時フロート・固定高さ） -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-1.5 shadow-inner">
+        
+        <!-- 各リールの停止ステータス行（左・中・右） -->
+        <div class="grid grid-cols-3 gap-1.5 mb-1 text-center font-mono text-[10px]">
+          <div id="hud-status-0" onclick="clearSingleReel(0)" title="タップで左リールを回転中に戻す" class="bg-slate-950/80 py-0.5 rounded border border-slate-800 text-slate-400 font-bold truncate select-none">
+            左: <span class="text-slate-500">回転中</span>
+          </div>
+          <div id="hud-status-1" onclick="clearSingleReel(1)" title="タップで中リールを回転中に戻す" class="bg-slate-950/80 py-0.5 rounded border border-slate-800 text-slate-400 font-bold truncate select-none">
+            中: <span class="text-slate-500">回転中</span>
+          </div>
+          <div id="hud-status-2" onclick="clearSingleReel(2)" title="タップで右リールを回転中に戻す" class="bg-slate-950/80 py-0.5 rounded border border-slate-800 text-slate-400 font-bold truncate select-none">
+            右: <span class="text-slate-500">回転中</span>
+          </div>
+        </div>
+
+        <!-- 3×3 リール停止図柄フレーム（中段に有効ライン光彩・タップで回転中へ復帰） -->
+        <div class="relative grid grid-cols-3 gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800/90 overflow-hidden">
+          
+          <!-- 中段有効ライン（赤ライン） -->
+          <div class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-7 bg-rose-500/10 border-y border-rose-500/40 pointer-events-none z-10"></div>
+          <div class="absolute left-0.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-rose-500/80 font-bold z-20 pointer-events-none">▶</div>
+          <div class="absolute right-0.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-rose-500/80 font-bold z-20 pointer-events-none">◀</div>
+
+          <!-- 左リール 3段 -->
+          <div id="hud-reel-col-0" onclick="clearSingleReel(0)" title="タップで左リールを回転中に戻す" class="flex flex-col gap-0.5 text-center font-mono select-none transition">
+            <div id="slot-0-top" class="h-6 flex items-center justify-center text-[10px] text-slate-500 bg-slate-900/40 rounded truncate px-0.5">--</div>
+            <div id="slot-0-mid" class="h-7 flex items-center justify-center text-[11px] font-bold text-slate-400 bg-slate-900/90 rounded border border-slate-800 shadow truncate px-0.5 z-20">回転中</div>
+            <div id="slot-0-bot" class="h-6 flex items-center justify-center text-[10px] text-slate-500 bg-slate-900/40 rounded truncate px-0.5">--</div>
+          </div>
+
+          <!-- 中リール 3段 -->
+          <div id="hud-reel-col-1" onclick="clearSingleReel(1)" title="タップで中リールを回転中に戻す" class="flex flex-col gap-0.5 text-center font-mono select-none transition">
+            <div id="slot-1-top" class="h-6 flex items-center justify-center text-[10px] text-slate-500 bg-slate-900/40 rounded truncate px-0.5">--</div>
+            <div id="slot-1-mid" class="h-7 flex items-center justify-center text-[11px] font-bold text-slate-400 bg-slate-900/90 rounded border border-slate-800 shadow truncate px-0.5 z-20">回転中</div>
+            <div id="slot-1-bot" class="h-6 flex items-center justify-center text-[10px] text-slate-500 bg-slate-900/40 rounded truncate px-0.5">--</div>
+          </div>
+
+          <!-- 右リール 3段 -->
+          <div id="hud-reel-col-2" onclick="clearSingleReel(2)" title="タップで右リールを回転中に戻す" class="flex flex-col gap-0.5 text-center font-mono select-none transition">
+            <div id="slot-2-top" class="h-6 flex items-center justify-center text-[10px] text-slate-500 bg-slate-900/40 rounded truncate px-0.5">--</div>
+            <div id="slot-2-mid" class="h-7 flex items-center justify-center text-[11px] font-bold text-slate-400 bg-slate-900/90 rounded border border-slate-800 shadow truncate px-0.5 z-20">回転中</div>
+            <div id="slot-2-bot" class="h-6 flex items-center justify-center text-[10px] text-slate-500 bg-slate-900/40 rounded truncate px-0.5">--</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 3行目: 入賞判定バッジ & 払出枚数（固定高さ・ガタつきなし） -->
+      <div class="h-6 flex items-center justify-between px-1 text-xs">
+        <div class="flex items-center gap-1.5 truncate">
+          <span class="text-[10px] text-slate-400">判定:</span>
+          <span id="payout-result-badge" class="px-2 py-0.5 rounded font-mono font-bold text-[11px] bg-slate-900 text-slate-400 border border-slate-800 truncate">
+            0/3 停止待ち
+          </span>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <span id="payout-coins" class="font-mono font-bold text-amber-400 text-xs">-- 枚</span>
+          <button onclick="toggleModal('modal-log')" class="text-[11px] text-slate-400 hover:text-white underline font-mono">
+            制御ログ
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ===================================================================
+       2. メイン操作エリア: 21コマ ダイレクトタップボード (3列並び)
+       =================================================================== -->
+  <main class="max-w-md mx-auto px-2 pt-3">
+    
+    <!-- カラムヘッダー（左・中・右） -->
+    <div class="grid grid-cols-3 gap-2 mb-2 px-1 text-center font-mono text-xs font-bold text-slate-400">
+      <div class="flex items-center justify-center gap-1 bg-slate-900/60 py-1 rounded-lg border border-slate-800">
+        <span>左リール</span>
+        <button onclick="clearSingleReel(0)" title="左リールのみ解除" class="text-[10px] text-rose-400 hover:text-rose-300">✕</button>
+      </div>
+      <div class="flex items-center justify-center gap-1 bg-slate-900/60 py-1 rounded-lg border border-slate-800">
+        <span>中リール</span>
+        <button onclick="clearSingleReel(1)" title="中リールのみ解除" class="text-[10px] text-rose-400 hover:text-rose-300">✕</button>
+      </div>
+      <div class="flex items-center justify-center gap-1 bg-slate-900/60 py-1 rounded-lg border border-slate-800">
+        <span>右リール</span>
+        <button onclick="clearSingleReel(2)" title="右リールのみ解除" class="text-[10px] text-rose-400 hover:text-rose-300">✕</button>
+      </div>
+    </div>
+
+    <!-- 0〜20コマ リールグリッド (縦スクロール) -->
+    <div id="reel-tap-grid" class="space-y-1.5 font-mono">
+      <!-- 0〜20番の全行がJSで動的生成されます -->
+    </div>
+
+  </main>
+
+  <!-- ===================================================================
+       3. 下部固定アクションバー（設定・テーブル・クイック操作）
+       =================================================================== -->
+  <footer class="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur border-t border-slate-800 p-1.5">
+    <div class="max-w-md mx-auto grid grid-cols-6 gap-1 text-[10px] font-semibold text-center">
+      <button onclick="autoStopAll()" class="bg-slate-900 active:bg-slate-800 text-slate-300 border border-slate-800 py-2 rounded-xl transition truncate">
+        🎲 適当
+      </button>
+      <button onclick="openTableModal()" class="bg-slate-900 active:bg-slate-800 text-slate-300 border border-slate-800 py-2 rounded-xl transition truncate">
+        📊 表
+      </button>
+      <button onclick="openStripsModal()" class="bg-slate-900 active:bg-slate-800 text-sky-300 border border-sky-500/30 py-2 rounded-xl transition truncate">
+        🎞️ 配列
+      </button>
+      <button onclick="openRulesModal()" class="bg-slate-900 active:bg-slate-800 text-slate-300 border border-slate-800 py-2 rounded-xl transition truncate">
+        🎯 役・重複
+      </button>
+      <button onclick="openSpecialModal()" class="bg-slate-900 active:bg-slate-800 text-slate-300 border border-slate-800 py-2 rounded-xl transition truncate">
+        ⚙️ 特殊
+      </button>
+      <button onclick="openDataModal()" class="bg-rose-950/40 active:bg-rose-900/60 text-rose-300 border border-rose-500/40 py-2 rounded-xl transition truncate">
+        💾 保存
+      </button>
+    </div>
+  </footer>
+
+  <!-- ===================================================================
+       4. モーダル群 (スマホ用フルスクリーン / ドロワー)
+       =================================================================== -->
+
+  <!-- 制御ログモーダル -->
+  <div id="modal-log" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex flex-col justify-end p-2 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full mx-auto max-h-[85vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between p-3.5 border-b border-slate-800">
+        <h3 class="text-xs font-bold text-white flex items-center gap-1.5 font-mono">
+          <span>⚡</span> スベリ判定詳細ログ (優先度順)
+        </h3>
+        <button onclick="toggleModal('modal-log')" class="text-slate-400 hover:text-white text-base px-2">✕</button>
+      </div>
+      <div id="sim-log-box" class="p-3 overflow-y-auto space-y-2 text-xs font-mono bg-slate-950 flex-1">
+        <div class="text-slate-500 italic">リールのコマをタップすると、ここに0〜4コマの探索・除外・決定理由が表示されます。</div>
+      </div>
+      <div class="p-2 border-t border-slate-800 bg-slate-900/80 text-center">
+        <button onclick="toggleModal('modal-log')" class="w-full py-2 bg-slate-800 active:bg-slate-700 rounded-xl text-xs font-bold text-slate-200">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全コマスベリテーブルモーダル -->
+  <div id="modal-table" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex flex-col justify-end p-2 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full mx-auto max-h-[90vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between p-3.5 border-b border-slate-800">
+        <div>
+          <h3 class="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+            <span>📊</span> 全21コマ スベリテーブル (0〜4)
+          </h3>
+          <p class="text-[10px] text-slate-400">現在フラグでの全押し位置スベリ一覧</p>
+        </div>
+        <button onclick="toggleModal('modal-table')" class="text-slate-400 hover:text-white text-base px-2">✕</button>
+      </div>
+      <div class="overflow-y-auto p-2 bg-slate-950 flex-1">
+        <table class="w-full text-left text-[11px] font-mono border-collapse">
+          <thead>
+            <tr class="text-slate-400 border-b border-slate-800 bg-slate-900/50">
+              <th class="py-1.5 px-2">コマ</th>
+              <th class="py-1.5 px-1 text-center">左</th>
+              <th class="py-1.5 px-1 text-center">中</th>
+              <th class="py-1.5 px-1 text-center">右</th>
+            </tr>
+          </thead>
+          <tbody id="modal-table-body" class="divide-y divide-slate-800/60">
+            <!-- JSで動的生成 -->
+          </tbody>
+        </table>
+      </div>
+      <div class="p-2 border-t border-slate-800 flex gap-2">
+        <button onclick="exportTableCSV()" class="flex-1 py-2 bg-slate-800 active:bg-slate-700 rounded-xl text-xs font-bold text-slate-200">
+          CSVエクスポート
+        </button>
+        <button onclick="toggleModal('modal-table')" class="flex-1 py-2 bg-rose-600 active:bg-rose-500 rounded-xl text-xs font-bold text-white">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 役・共通フラグ設定モーダル -->
+  <div id="modal-rules" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex flex-col justify-end p-2 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full mx-auto max-h-[90vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between p-3.5 border-b border-slate-800">
+        <h3 class="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+          <span>🎯</span> 役（配当役）＆ 共通フラグ設定
+        </h3>
+        <button onclick="toggleModal('modal-rules')" class="text-slate-400 hover:text-white text-base px-2">✕</button>
+      </div>
+      <div class="overflow-y-auto p-3 space-y-4 bg-slate-950 flex-1 text-xs">
+        
+        <!-- 1. 役（配当役）セクション -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h4 id="rules-role-header" class="font-bold text-slate-300 text-[11px]">登録されている役</h4>
+            <button onclick="openRoleEditor(null)" class="px-2.5 py-1 bg-rose-600/20 text-rose-300 border border-rose-500/40 rounded-lg font-bold text-[11px] active:bg-rose-600/40">
+              + 役を追加
+            </button>
+          </div>
+
+          <!-- 役 追加・編集インラインフォーム -->
+          <div id="role-editor-panel" class="hidden mb-2.5 p-3 bg-slate-900 border border-rose-500/50 rounded-xl space-y-2.5 shadow-lg">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+              <span id="role-editor-title" class="font-bold text-rose-300 text-xs">新規役の追加</span>
+              <button onclick="closeRoleEditor()" class="text-slate-400 text-xs px-1">✕</button>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">役名</label>
+              <input type="text" id="role-edit-name" placeholder="例: リーチ目1枚役C" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-rose-500">
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">図柄組み合わせ（左 / 中 / 右）</label>
+              <div class="grid grid-cols-3 gap-1.5">
+                <select id="role-edit-sym0" class="bg-slate-950 border border-slate-700 rounded-lg px-1.5 py-1.5 text-[11px] text-white font-mono"></select>
+                <select id="role-edit-sym1" class="bg-slate-950 border border-slate-700 rounded-lg px-1.5 py-1.5 text-[11px] text-white font-mono"></select>
+                <select id="role-edit-sym2" class="bg-slate-950 border border-slate-700 rounded-lg px-1.5 py-1.5 text-[11px] text-white font-mono"></select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-1">払出枚数 (0〜15)</label>
+                <input type="number" id="role-edit-payout" min="0" max="15" value="0" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono">
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-1">役種別</label>
+                <select id="role-edit-type" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white">
+                  <option value="small">小役</option>
+                  <option value="bonus">ボーナス</option>
+                  <option value="replay">リプレイ</option>
+                  <option value="special">特殊・リーチ目</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">🎯 優先揃いライン（上段で止めず中・下段へ滑らせたい時に指定）</label>
+              <select id="role-edit-line" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-sky-300 font-bold">
+                <option value="any">指定なし（最小スベリ優先・上段等）</option>
+                <option value="mid">中段ライン優先（中段まで滑らせる）</option>
+                <option value="bot">下段ライン優先（下段まで滑らせる）</option>
+                <option value="top">上段ライン優先</option>
+                <option value="diag_down">右下がりライン優先</option>
+                <option value="diag_up">右上がりライン優先</option>
+              </select>
+            </div>
+
+            <!-- 代用図柄（変則押し救済パターン）設定 -->
+            <div class="pt-2 border-t border-slate-800 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label class="text-[10px] font-bold text-amber-300">🔄 代用図柄（救済パターン）</label>
+                <button type="button" onclick="addDraftSubstitute()" class="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded text-[10px] font-bold active:bg-amber-500/30">
+                  + 代用追加
+                </button>
+              </div>
+              <div id="role-edit-subs-container" class="space-y-1.5 max-h-40 overflow-y-auto">
+                <!-- JSで動的生成 -->
+              </div>
+            </div>
+
+            <div class="flex gap-2 pt-1">
+              <button onclick="closeRoleEditor()" class="flex-1 py-1.5 bg-slate-800 active:bg-slate-700 rounded-lg text-slate-300 font-bold text-xs">キャンセル</button>
+              <button onclick="saveRoleForm()" class="flex-1 py-1.5 bg-rose-600 active:bg-rose-500 rounded-lg text-white font-bold text-xs">保存する</button>
+            </div>
+          </div>
+
+          <div id="rules-role-list" class="space-y-1.5">
+            <!-- JS生成 -->
+          </div>
+        </div>
+
+        <!-- 2. 共通フラグセクション -->
+        <div class="pt-3 border-t border-slate-800">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-slate-300 text-[11px]">共通フラグ（同時成立・優先度）</h4>
+            <button onclick="openCommonEditor(null)" class="px-2.5 py-1 bg-rose-600/20 text-rose-300 border border-rose-500/40 rounded-lg font-bold text-[11px] active:bg-rose-600/40">
+              + 共通フラグ追加
+            </button>
+          </div>
+
+          <!-- 共通フラグ 追加・編集インラインフォーム -->
+          <div id="common-editor-panel" class="hidden mb-2.5 p-3 bg-slate-900 border border-rose-500/50 rounded-xl space-y-2.5 shadow-lg">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+              <span id="common-editor-title" class="font-bold text-rose-300 text-xs">共通フラグの作成</span>
+              <button onclick="closeCommonEditor()" class="text-slate-400 text-xs px-1">✕</button>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">共通フラグ名</label>
+              <input type="text" id="common-edit-name" placeholder="例: 赤7 ＋ チェリー重複" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-rose-500">
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">重複時の引き込み優先ルール</label>
+              <select id="common-edit-priority" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white">
+                <option value="bonus">ボーナス優先（ボーナス図柄を優先引き込み）</option>
+                <option value="small">小役・リプレイ優先（小役取りこぼし防止）</option>
+                <option value="payout">最大払出優先（枚数が多い役を優先）</option>
+                <option value="custom">個別優先順位（下のリストの上位順）</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">同時成立させる役＆優先順（↑↓で順番変更）</label>
+              <div id="common-edit-roles-container" class="space-y-1.5 bg-slate-950 p-2 rounded-lg border border-slate-800 max-h-44 overflow-y-auto">
+                <!-- JS生成 -->
+              </div>
+            </div>
+            <div class="flex gap-2 pt-1">
+              <button onclick="closeCommonEditor()" class="flex-1 py-1.5 bg-slate-800 active:bg-slate-700 rounded-lg text-slate-300 font-bold text-xs">キャンセル</button>
+              <button onclick="saveCommonForm()" class="flex-1 py-1.5 bg-rose-600 active:bg-rose-500 rounded-lg text-white font-bold text-xs">保存する</button>
+            </div>
+          </div>
+
+          <div id="rules-common-list" class="space-y-1.5">
+            <!-- JS生成 -->
+          </div>
+        </div>
+
+      </div>
+      <div class="p-2 border-t border-slate-800">
+        <button onclick="toggleModal('modal-rules')" class="w-full py-2 bg-slate-800 active:bg-slate-700 rounded-xl text-xs font-bold text-slate-200">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 特殊制御ルール設定モーダル -->
+  <div id="modal-special" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex flex-col justify-end p-2 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full mx-auto max-h-[90vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between p-3.5 border-b border-slate-800">
+        <h3 class="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+          <span>⚙️</span> 特殊スベリ制御ルール
+        </h3>
+        <button onclick="toggleModal('modal-special')" class="text-slate-400 hover:text-white text-base px-2">✕</button>
+      </div>
+      <div class="overflow-y-auto p-3 space-y-2.5 bg-slate-950 flex-1 text-xs">
+        
+        <!-- 特殊制御 追加・編集インラインフォーム -->
+        <div id="special-editor-panel" class="hidden p-3 bg-slate-900 border border-purple-500/50 rounded-xl space-y-2.5 shadow-lg">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+            <span id="special-editor-title" class="font-bold text-purple-300 text-xs">特殊スベリ制御の追加</span>
+            <button onclick="closeSpecialEditor()" class="text-slate-400 text-xs px-1">✕</button>
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400 mb-1">ルール名（空欄なら自動命名）</label>
+            <input type="text" id="special-edit-name" placeholder="例: ベル重複時・左中段ベル滑り" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500">
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400 mb-1">対象成立フラグ</label>
+            <select id="special-edit-flag" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white"></select>
+          </div>
+          <div class="grid grid-cols-3 gap-1.5">
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">対象リール</label>
+              <select id="special-edit-reel" onchange="updateSpecialPosOptions()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-1.5 py-1.5 text-[11px] text-white font-mono">
+                <option value="0">左リール</option>
+                <option value="1">中リール</option>
+                <option value="2">右リール</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">押下位置</label>
+              <select id="special-edit-pos" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-1.5 py-1.5 text-[11px] text-white font-mono"></select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">強制スベリ</label>
+              <select id="special-edit-slide" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-1.5 py-1.5 text-[11px] text-amber-300 font-mono font-bold">
+                <option value="0">0コマ (ビタ)</option>
+                <option value="1">1コマ滑り</option>
+                <option value="2">2コマ滑り</option>
+                <option value="3">3コマ滑り</option>
+                <option value="4" selected>4コマ大スベリ</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex gap-2 pt-1">
+            <button onclick="closeSpecialEditor()" class="flex-1 py-1.5 bg-slate-800 active:bg-slate-700 rounded-lg text-slate-300 font-bold text-xs">キャンセル</button>
+            <button onclick="saveSpecialForm()" class="flex-1 py-1.5 bg-purple-600 active:bg-purple-500 rounded-lg text-white font-bold text-xs">保存する</button>
+          </div>
+        </div>
+
+        <div id="rules-special-list" class="space-y-2">
+          <!-- JS生成 -->
+        </div>
+      </div>
+      <div class="p-2 border-t border-slate-800 flex gap-2">
+        <button onclick="openSpecialEditor(null)" class="flex-1 py-2 bg-rose-600 active:bg-rose-500 rounded-xl text-xs font-bold text-white">
+          + ルール追加
+        </button>
+        <button onclick="toggleModal('modal-special')" class="flex-1 py-2 bg-slate-800 active:bg-slate-700 rounded-xl text-xs font-bold text-slate-200">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- リール配列エディタモーダル -->
+  <div id="modal-strips" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex flex-col justify-end p-2 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full mx-auto max-h-[92vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between p-3 border-b border-slate-800">
+        <div>
+          <h3 class="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+            <span>🎞️</span> リール配列エディタ (21コマ編集)
+          </h3>
+          <p class="text-[10px] text-slate-400">小役A/B/Cを配置してリーチ目1枚役を構成できます</p>
+        </div>
+        <button onclick="toggleModal('modal-strips')" class="text-slate-400 hover:text-white text-base px-2">✕</button>
+      </div>
+
+      <!-- リール選択タブ（左・中・右） -->
+      <div class="grid grid-cols-3 gap-1.5 p-2 bg-slate-950 border-b border-slate-800 text-xs font-bold">
+        <button id="strip-tab-0" onclick="selectStripEditReel(0)" class="py-1.5 rounded-lg bg-rose-600 text-white transition">左リール</button>
+        <button id="strip-tab-1" onclick="selectStripEditReel(1)" class="py-1.5 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 transition">中リール</button>
+        <button id="strip-tab-2" onclick="selectStripEditReel(2)" class="py-1.5 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 transition">右リール</button>
+      </div>
+
+      <!-- ワンタップ連続スタンプ用パレット -->
+      <div class="p-2 bg-slate-900/90 border-b border-slate-800 space-y-1">
+        <div class="flex items-center justify-between text-[10px]">
+          <span class="text-amber-300 font-bold">🖌️ クイック配置パレット（選択中図柄を下のコマへ連続セット）</span>
+          <button onclick="selectStripBrush(null)" class="text-slate-400 underline">解除</button>
+        </div>
+        <div id="strip-brush-palette" class="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+          <!-- JSで動的生成 -->
+        </div>
+      </div>
+
+      <!-- 21コマ編集リスト -->
+      <div id="strip-edit-list" class="overflow-y-auto p-2.5 space-y-1.5 bg-slate-950 flex-1 font-mono text-xs">
+        <!-- JSで動的生成 -->
+      </div>
+
+      <div class="p-2 border-t border-slate-800 flex gap-2">
+        <button onclick="resetSingleStripToDefault()" class="py-2 px-3 bg-slate-800 active:bg-slate-700 rounded-xl text-[11px] font-bold text-slate-300">
+          このリールを初期値へ
+        </button>
+        <button onclick="toggleModal('modal-strips')" class="flex-1 py-2 bg-rose-600 active:bg-rose-500 rounded-xl text-xs font-bold text-white">
+          完了して閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- データ保存・読込 (JSON入出力) モーダル -->
+  <div id="modal-data" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex flex-col justify-end p-2 sm:p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full mx-auto max-h-[90vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between p-3.5 border-b border-slate-800">
+        <div>
+          <h3 class="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+            <span>💾</span> 設定データ管理 (JSON入出力)
+          </h3>
+          <p class="text-[10px] text-slate-400">共通フラグ・特殊制御・現在の停止状態を保存/復元</p>
+        </div>
+        <button onclick="toggleModal('modal-data')" class="text-slate-400 hover:text-white text-base px-2">✕</button>
+      </div>
+
+      <div class="overflow-y-auto p-3.5 space-y-4 bg-slate-950 flex-1 text-xs">
+        
+        <!-- ステータスメッセージ領域 -->
+        <div id="data-status-msg" class="hidden p-2 rounded-lg text-xs font-mono border"></div>
+
+        <!-- エクスポート (書き出し) -->
+        <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2">
+          <h4 class="font-bold text-slate-200 text-xs flex items-center gap-1">
+            <span>📤</span> 設定を書き出す (エクスポート)
+          </h4>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            作成したリール配列・役・共通フラグ・特殊制御ルールをJSONファイルとして保存します。
+          </p>
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button onclick="exportProjectDataJSON()" class="py-2 px-2 bg-rose-600 active:bg-rose-500 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-1">
+              <span>⬇️</span> JSONファイル保存
+            </button>
+            <button onclick="copyProjectDataToClipboard()" class="py-2 px-2 bg-slate-800 active:bg-slate-700 rounded-lg text-slate-200 font-bold text-xs flex items-center justify-center gap-1">
+              <span>📋</span> JSONをコピー
+            </button>
+          </div>
+        </div>
+
+        <!-- インポート (読み込み) -->
+        <div class="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-2">
+          <h4 class="font-bold text-slate-200 text-xs flex items-center gap-1">
+            <span>📥</span> 設定を読み込む (インポート)
+          </h4>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            保存したJSONファイル、またはテキストから設定を復元します。
+          </p>
+          
+          <div>
+            <label class="block text-[11px] text-slate-400 mb-1">ファイルから読み込み:</label>
+            <input type="file" id="json-file-input" accept=".json,application/json" onchange="importProjectDataFromFile(event)" class="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-rose-300 hover:file:bg-slate-700 cursor-pointer">
+          </div>
+
+          <div class="pt-2 border-t border-slate-800">
+            <label class="block text-[11px] text-slate-400 mb-1">またはJSON文字列を直接貼り付け:</label>
+            <textarea id="json-paste-area" rows="3" placeholder='{"version":4, ...}' class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-[10px] font-mono text-slate-300 focus:outline-none focus:ring-1 focus:ring-rose-500 resize-none"></textarea>
+            <button onclick="importProjectDataFromText()" class="w-full mt-1.5 py-1.5 bg-slate-800 active:bg-slate-700 rounded-lg text-xs font-bold text-rose-300">
+              貼り付けたJSONを適用
+            </button>
+          </div>
+        </div>
+
+        <!-- 初期プリセットに戻す -->
+        <div class="pt-1 flex items-center justify-between text-[11px] text-slate-500">
+          <span>初期サンプル状態へ戻す</span>
+          <button onclick="resetToDefaultData()" class="text-rose-400 hover:underline">
+            デフォルト設定を再読込
+          </button>
+        </div>
+
+      </div>
+
+      <div class="p-2 border-t border-slate-800">
+        <button onclick="toggleModal('modal-data')" class="w-full py-2 bg-slate-800 active:bg-slate-700 rounded-xl text-xs font-bold text-slate-200">
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       5. JavaScript エントリポイント (ES Modules)
+       =================================================================== -->
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
