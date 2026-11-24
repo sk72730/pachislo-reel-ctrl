@@ -1,5 +1,6 @@
 import { state } from "../state.js";
 import { getFlagDisplayName, toggleModal } from "../utils.js";
+import { saveStateToStorage } from "../storage.js";
 import { renderReelGrid } from "./hud.js";
 
 /* ---------------------------------------------------------
@@ -145,6 +146,7 @@ export function saveSpecialForm() {
     });
   }
 
+  saveStateToStorage();
   closeSpecialEditor();
   renderSpecialRulesList();
   renderReelGrid();
@@ -153,6 +155,7 @@ export function saveSpecialForm() {
 export function toggleSpecialRule(idx) {
   if (state.specialRules[idx]) {
     state.specialRules[idx].active = !state.specialRules[idx].active;
+    saveStateToStorage();
     renderSpecialRulesList();
     renderReelGrid();
   }
@@ -160,6 +163,7 @@ export function toggleSpecialRule(idx) {
 
 export function deleteSpecialRule(idx) {
   state.specialRules.splice(idx, 1);
+  saveStateToStorage();
   renderSpecialRulesList();
   renderReelGrid();
 }

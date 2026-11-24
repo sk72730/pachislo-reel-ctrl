@@ -1,4 +1,5 @@
 import { toggleModal } from "./utils.js";
+import { loadStateFromStorage } from "./storage.js";
 import { populateFlagSelect, updateHudDisplay, renderReelGrid, setReelTapHandler } from "./ui/hud.js";
 import {
   handleTapReel,
@@ -107,6 +108,7 @@ Object.assign(window, {
 function initApp() {
   if (window.__reelSimInitialized) return;
   window.__reelSimInitialized = true;
+  loadStateFromStorage();
   setReelTapHandler(handleTapReel);
   populateFlagSelect();
   updateHudDisplay();

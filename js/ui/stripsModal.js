@@ -1,6 +1,7 @@
 import { ALL_SYMBOLS, DEFAULT_REEL_STRIPS } from "../constants.js";
 import { state } from "../state.js";
 import { getSymbolBadgeStyle, toggleModal } from "../utils.js";
+import { saveStateToStorage } from "../storage.js";
 import { updateHudDisplay, renderReelGrid } from "./hud.js";
 
 /* ---------------------------------------------------------
@@ -87,6 +88,7 @@ export function applyBrushToStripCell(idx) {
 
 export function changeStripSymbol(idx, newSymbol) {
   state.reelStrips[currentStripEditReel][idx] = newSymbol;
+  saveStateToStorage();
   renderStripEditList();
   updateHudDisplay();
   renderReelGrid();
@@ -94,6 +96,7 @@ export function changeStripSymbol(idx, newSymbol) {
 
 export function resetSingleStripToDefault() {
   state.reelStrips[currentStripEditReel] = [...DEFAULT_REEL_STRIPS[currentStripEditReel]];
+  saveStateToStorage();
   renderStripEditList();
   updateHudDisplay();
   renderReelGrid();

@@ -1,6 +1,7 @@
 import { createEmptyStopState } from "../constants.js";
 import { state } from "../state.js";
 import { calculateSlideForReel } from "../engine.js";
+import { saveStateToStorage } from "../storage.js";
 import { updateHudDisplay, renderReelGrid, appendLogsToModal } from "./hud.js";
 
 /* ---------------------------------------------------------
@@ -29,6 +30,7 @@ export function handleTapReel(reelIndex, pushPos) {
     slide: result.slide
   };
 
+  saveStateToStorage();
   updateHudDisplay();
   renderReelGrid();
   appendLogsToModal(reelIndex, result.logs);
@@ -39,6 +41,7 @@ export function clearSingleReel(reelIndex) {
   if (state.reelStopState.every(s => !s.stopped)) {
     state.firstStoppedReel = null;
   }
+  saveStateToStorage();
   updateHudDisplay();
   renderReelGrid();
 }
@@ -50,6 +53,7 @@ export function resetReelTest() {
   if (box) {
     box.innerHTML = `<div class="text-slate-500 italic">リセットしました。任意のコマをタップしてください。</div>`;
   }
+  saveStateToStorage();
   updateHudDisplay();
   renderReelGrid();
 }
@@ -69,5 +73,6 @@ export function onFlagChanged() {
 }
 
 export function onPolicyChanged() {
+  saveStateToStorage();
   renderReelGrid();
 }

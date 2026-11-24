@@ -1,5 +1,6 @@
 import { state } from "../state.js";
 import { getAllAvailableSymbols, toggleModal } from "../utils.js";
+import { saveStateToStorage } from "../storage.js";
 import { populateFlagSelect, updateHudDisplay, renderReelGrid } from "./hud.js";
 
 /* ---------------------------------------------------------
@@ -237,6 +238,7 @@ export function saveRoleForm() {
     });
   }
 
+  saveStateToStorage();
   closeRoleEditor();
   renderRulesLists();
   populateFlagSelect();
@@ -253,6 +255,7 @@ export function deleteRole(roleId) {
   if (state.currentFlag === roleId) {
     state.currentFlag = "hazure";
   }
+  saveStateToStorage();
   renderRulesLists();
   populateFlagSelect();
   updateHudDisplay();
@@ -375,6 +378,7 @@ export function saveCommonForm() {
     });
   }
 
+  saveStateToStorage();
   closeCommonEditor();
   renderRulesLists();
   populateFlagSelect();
@@ -386,6 +390,7 @@ export function deleteCommonFlag(commonId) {
   if (state.currentFlag === commonId) {
     state.currentFlag = "hazure";
   }
+  saveStateToStorage();
   renderRulesLists();
   populateFlagSelect();
   updateHudDisplay();

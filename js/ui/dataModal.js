@@ -6,6 +6,7 @@ import {
 } from "../constants.js";
 import { state } from "../state.js";
 import { toggleModal } from "../utils.js";
+import { saveStateToStorage, clearStorage } from "../storage.js";
 import { populateFlagSelect, updateHudDisplay, renderReelGrid } from "./hud.js";
 import { resetReelTest } from "./simulator.js";
 
@@ -107,6 +108,7 @@ export function applyProjectData(data) {
     state.reelStopState = data.reelStopState;
   }
 
+  saveStateToStorage();
   populateFlagSelect();
   updateHudDisplay();
   renderReelGrid();
@@ -158,6 +160,7 @@ export function resetToDefaultData() {
   if (sel) sel.value = "min";
 
   resetReelTest();
+  clearStorage();
   populateFlagSelect();
-  showDataStatus("初期サンプル設定に戻しました");
+  showDataStatus("初期サンプル設定に戻しました（自動保存データも初期化しました）");
 }
