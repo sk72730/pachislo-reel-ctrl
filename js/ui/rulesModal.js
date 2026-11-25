@@ -252,6 +252,7 @@ export function deleteRole(roleId) {
   state.commonFlags.forEach(cf => {
     cf.roleIds = cf.roleIds.filter(id => id !== roleId);
   });
+  state.specialRules = state.specialRules.filter(r => r.flagId !== roleId);
   if (state.currentFlag === roleId) {
     state.currentFlag = "hazure";
   }
@@ -387,6 +388,7 @@ export function saveCommonForm() {
 
 export function deleteCommonFlag(commonId) {
   state.commonFlags = state.commonFlags.filter(c => c.id !== commonId);
+  state.specialRules = state.specialRules.filter(r => r.flagId !== commonId);
   if (state.currentFlag === commonId) {
     state.currentFlag = "hazure";
   }

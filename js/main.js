@@ -9,7 +9,15 @@ import {
   onFlagChanged,
   onPolicyChanged
 } from "./ui/simulator.js";
-import { openTableModal, exportTableCSV } from "./ui/tableModal.js";
+import {
+  openTableModal,
+  switchTableTab,
+  setLeftMatrixFilter,
+  openLeftCellEditor,
+  closeLeftCellEditor,
+  applyLeftCellSlide,
+  exportTableCSV
+} from "./ui/tableModal.js";
 import {
   openRulesModal,
   openRoleEditor,
@@ -65,6 +73,11 @@ Object.assign(window, {
   onFlagChanged,
   onPolicyChanged,
   openTableModal,
+  switchTableTab,
+  setLeftMatrixFilter,
+  openLeftCellEditor,
+  closeLeftCellEditor,
+  applyLeftCellSlide,
   exportTableCSV,
   openRulesModal,
   openRoleEditor,

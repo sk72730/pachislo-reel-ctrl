@@ -197,19 +197,31 @@
     </div>
   </div>
 
-  <!-- 全コマスベリテーブルモーダル -->
+  <!-- 全コマスベリテーブル ＆ 左リール制御表モーダル -->
   <div id="modal-table" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex flex-col justify-end p-2 sm:p-4">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full mx-auto max-h-[90vh] flex flex-col shadow-2xl">
-      <div class="flex items-center justify-between p-3.5 border-b border-slate-800">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full mx-auto max-h-[92vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between p-3 border-b border-slate-800">
         <div>
           <h3 class="text-xs font-bold text-white font-mono flex items-center gap-1.5">
-            <span>📊</span> 全21コマ スベリテーブル (0〜4)
+            <span>📊</span> スベリテーブル ＆ 左リール制御表
           </h3>
-          <p class="text-[10px] text-slate-400">現在フラグでの全押し位置スベリ一覧</p>
+          <p id="modal-table-subtitle" class="text-[10px] text-slate-400">現在フラグでの全押し位置スベリ一覧</p>
         </div>
         <button onclick="toggleModal('modal-table')" class="text-slate-400 hover:text-white text-base px-2">✕</button>
       </div>
-      <div class="overflow-y-auto p-2 bg-slate-950 flex-1">
+
+      <!-- タブ切替 -->
+      <div class="grid grid-cols-2 gap-1.5 p-2 bg-slate-950 border-b border-slate-800 text-[11px] font-bold">
+        <button id="table-tab-current" onclick="switchTableTab('current')" class="py-1.5 rounded-lg bg-rose-600 text-white transition">
+          現在フラグ (左/中/右)
+        </button>
+        <button id="table-tab-left-matrix" onclick="switchTableTab('left_matrix')" class="py-1.5 rounded-lg bg-slate-900 text-slate-400 border border-slate-800 transition">
+          左リール制御表 (全フラグ)
+        </button>
+      </div>
+
+      <!-- タブ1: 現在フラグの3リールテーブル -->
+      <div id="table-view-current" class="overflow-y-auto p-2 bg-slate-950 flex-1">
         <table class="w-full text-left text-[11px] font-mono border-collapse">
           <thead>
             <tr class="text-slate-400 border-b border-slate-800 bg-slate-900/50">
@@ -224,6 +236,56 @@
           </tbody>
         </table>
       </div>
+
+      <!-- タブ2: 左リール制御表（全フラグ横断マトリクス＋直接編集） -->
+      <div id="table-view-left-matrix" class="hidden flex-1 flex flex-col min-h-0 bg-slate-950">
+        <!-- フィルタ ＆ 凡例 -->
+        <div class="p-2 border-b border-slate-800 bg-slate-900/70 space-y-1.5">
+          <div class="flex items-center justify-between gap-1.5">
+            <div class="flex items-center gap-1 text-[10px] font-bold">
+              <button id="left-filter-all" onclick="setLeftMatrixFilter('all')" class="px-2 py-1 rounded bg-rose-600 text-white">すべて</button>
+              <button id="left-filter-single" onclick="setLeftMatrixFilter('single')" class="px-2 py-1 rounded bg-slate-800 text-slate-300">単独役</button>
+              <button id="left-filter-common" onclick="setLeftMatrixFilter('common')" class="px-2 py-1 rounded bg-slate-800 text-slate-300">重複</button>
+            </div>
+            <span id="left-matrix-summary" class="text-[10px] font-mono text-slate-400 truncate">マスをタップで強制スベリ設定</span>
+          </div>
+          <div class="flex items-center gap-2 text-[9px] font-mono text-slate-400 flex-wrap">
+            <span><span class="text-purple-300 font-bold">★</span>=強制スベリ</span>
+            <span><span class="text-rose-400 font-bold">⚠️</span>=安全制約で無効/FS</span>
+            <span class="text-slate-500">※「⚙️特殊」と完全連動</span>
+          </div>
+        </div>
+
+        <!-- インライン セル編集パネル -->
+        <div id="left-cell-editor" class="hidden p-2.5 bg-slate-900 border-b border-purple-500/50 space-y-2 shadow-lg">
+          <div class="flex items-center justify-between gap-2">
+            <div id="left-cell-editor-title" class="text-[11px] font-bold text-purple-300 font-mono truncate"></div>
+            <button onclick="closeLeftCellEditor()" class="text-slate-400 hover:text-white text-xs px-1.5">✕</button>
+          </div>
+          <div id="left-cell-editor-warn" class="hidden text-[10px] text-rose-300 bg-rose-950/60 border border-rose-500/40 rounded px-2 py-1 font-mono"></div>
+          <div id="left-cell-editor-options" class="grid grid-cols-5 gap-1 font-mono">
+            <!-- JSで0〜4コマボタン生成 -->
+          </div>
+          <div class="flex justify-end">
+            <button onclick="applyLeftCellSlide(null)" class="px-2.5 py-1 bg-slate-800 active:bg-slate-700 rounded-lg text-[10px] font-bold text-slate-200 border border-slate-700">
+              自動制御に戻す（強制解除）
+            </button>
+          </div>
+        </div>
+
+        <!-- 横スクロール可能な21コマ×全フラグ表 -->
+        <div class="overflow-auto flex-1">
+          <table class="w-max min-w-full text-left text-[10px] font-mono border-collapse">
+            <thead id="left-matrix-head" class="sticky top-0 z-20 bg-slate-900">
+              <!-- JSで動的生成 -->
+            </thead>
+            <tbody id="left-matrix-body" class="divide-y divide-slate-800/60">
+              <!-- JSで動的生成 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="p-2 border-t border-slate-800 flex gap-2">
         <button onclick="exportTableCSV()" class="flex-1 py-2 bg-slate-800 active:bg-slate-700 rounded-xl text-xs font-bold text-slate-200">
           CSVエクスポート
